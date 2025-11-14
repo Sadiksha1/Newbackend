@@ -32,10 +32,8 @@ def update_product(product_id: int, updated_product: schemas.ProductCreate, db: 
     product_db = db.query(models.Product).filter(models.Product.id == product_id).first()
     if not product_db:
         raise HTTPException(status_code=404, detail="Product not found")
-    
     for key, value in updated_product.dict().items():
         setattr(product_db, key, value)
-    
     db.commit()
     db.refresh(product_db)
     return product_db
@@ -46,7 +44,6 @@ def delete_product(product_id: int, db: Session = Depends(get_db)):
     product_db = db.query(models.Product).filter(models.Product.id == product_id).first()
     if not product_db:
         raise HTTPException(status_code=404, detail="Product not found")
-    
     db.delete(product_db)
     db.commit()
     return {"message": "Product deleted successfully"}
