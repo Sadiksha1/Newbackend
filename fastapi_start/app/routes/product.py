@@ -17,6 +17,14 @@ def get_db():
 def get_all_products(db: Session = Depends(get_db)):
     return db.query(models.Product).all()
 
+# GET single product by ID (new)
+@router.get("/{product_id}", response_model=schemas.ProductOut)
+def get_product(product_id: int, db: Session = Depends(get_db)):
+    product = db.query(models.Product).filter(models.Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return product
+
 # POST - create a product
 @router.post("/", response_model=schemas.ProductOut)
 def create_product(product: schemas.ProductCreate, db: Session = Depends(get_db)):
@@ -50,3 +58,4 @@ def delete_product(product_id: int, db: Session = Depends(get_db)):
     db.delete(product_db)
     db.commit()
     return {"message": "Product deleted successfully"}
+                    
