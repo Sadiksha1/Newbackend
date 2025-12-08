@@ -17,8 +17,12 @@ branch_labels = None
 depends_on = None
 
 def upgrade():
-    # Add the new column WITHOUT foreign key constraint
-    op.add_column('orders', sa.Column('product_id', sa.Integer(), nullable=True))
+    # Add the new column WITHOUT foreign key constraint, but skip if it already exists
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    columns = {col["name"] for col in inspector.get_columns("orders")}
+    if "product_id" not in columns:
+        op.add_column('orders', sa.Column('product_id', sa.Integer(), nullable=True))
 
 def downgrade():
     op.drop_column('orders', 'product_id')

@@ -16,49 +16,66 @@ if not db_path.exists():
 conn = sqlite3.connect(str(db_path))
 cursor = conn.cursor()
 
+
+def print_table(table_name: str, label: str, formatter=None):
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,))
+    if not cursor.fetchone():
+        print(f"\n{label} table does not exist")
+        return
+
+    cursor.execute(f"PRAGMA table_info({table_name})")
+    columns = [col[1] for col in cursor.fetchall()]
+
+    cursor.execute(f"SELECT * FROM {table_name}")
+    rows = cursor.fetchall()
+
+    print(f"\n{label}")
+    print("-" * 60)
+    print(f"Columns: {', '.join(columns)}")
+
+    if not rows:
+        print("  (No rows found)")
+        return
+
+    for row in rows:
+        data = dict(zip(columns, row))
+        if formatter:
+            print(formatter(data))
+        else:
+            print(f"  {data}")
+
+
 print("=" * 60)
 print("DATABASE CONTENTS")
 print("=" * 60)
 
-# View Products
-print("\n📦 PRODUCTS TABLE:")
-print("-" * 60)
-cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='products'")
-if cursor.fetchone():
-    cursor.execute("SELECT * FROM products")
-    products = cursor.fetchall()
-    if products:
-        # Get column names
-        cursor.execute("PRAGMA table_info(products)")
-        columns = [col[1] for col in cursor.fetchall()]
-        print(f"Columns: {', '.join(columns)}")
-        print()
-        for product in products:
-            print(f"  ID: {product[0]}, Name: {product[1]}, Price: {product[2]}, Category: {product[3]}, Image: {product[4]}")
-    else:
-        print("  (No products found)")
-else:
-    print("  (Products table does not exist)")
+print_table(
+    "products",
+    "📦 PRODUCTS TABLE:",
+    formatter=lambda d: f"  ID: {d.get('id')}, Name: {d.get('name')}, Price: {d.get('price')}, Category: {d.get('category')}, Image: {d.get('image')}",
+)
 
-# View Orders
-print("\n🛒 ORDERS TABLE:")
-print("-" * 60)
-cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='orders'")
-if cursor.fetchone():
-    cursor.execute("SELECT * FROM orders")
-    orders = cursor.fetchall()
-    if orders:
-        # Get column names
-        cursor.execute("PRAGMA table_info(orders)")
-        columns = [col[1] for col in cursor.fetchall()]
-        print(f"Columns: {', '.join(columns)}")
-        print()
-        for order in orders:
-            print(f"  ID: {order[0]}, Amount: {order[1]}, Product ID: {order[2]}, Product Name: {order[3]}, Status: {order[4]}")
-    else:
-        print("  (No orders found)")
-else:
-    print("  (Orders table does not exist)")
+print_table(
+    "orders",
+    "🛒 ORDERS TABLE:",
+    formatter=lambda d: (
+        "  ID: {id}, Amount: {amount}, Product ID: {product_id}, "
+        "Quantity: {quantity}, Status: {status}, Created: {created_at}"
+    ).format(
+        id=d.get("id"),
+        amount=d.get("amount"),
+        product_id=d.get("product_id"),
+        quantity=d.get("quantity"),
+        status=d.get("status"),
+        created_at=d.get("created_at"),
+    ),
+)
+
+print_table(
+    "admins",
+    "👤 ADMINS TABLE:",
+    formatter=lambda d: f"  ID: {d.get('id')}, Username: {d.get('username')}, Created: {d.get('created_at')}",
+)
 
 print("\n" + "=" * 60)
 conn.close()

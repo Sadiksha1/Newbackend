@@ -2,7 +2,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.database import Base, engine
-from app.routes import product, payment
+from app.routes import product, payment, admin
 import os
 
 app = FastAPI()
@@ -41,3 +41,4 @@ async def upload_image(file: UploadFile = File(...)):
 # Routers
 app.include_router(product.router)
 app.include_router(payment.router)
+app.include_router(admin.router)

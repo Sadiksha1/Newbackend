@@ -17,12 +17,17 @@ def get_db():
 # -----------------------------
 @router.post("/create-order", response_model=schemas.OrderOut)
 async def create_order(order: schemas.OrderCreate, db: Session = Depends(get_db)):
+    product = db.query(models.Product).filter(models.Product.id == order.product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    total_amount = round(product.price * order.quantity, 2)
 
     new_order = models.Order(
-        amount=order.amount,
-        product_id=order.product_id,
-        product_name=order.product_name,
-        status="pending"
+        amount=total_amount,
+        product_id=product.id,
+        quantity=order.quantity,
+        status="pending",
     )
     db.add(new_order)
     db.commit()
@@ -33,14 +38,15 @@ async def create_order(order: schemas.OrderCreate, db: Session = Depends(get_db)
 # -----------------------------
 # 2. Fonepay scans → user mobile opens this link
 # -----------------------------
-@router.get("/scan/{order_id}/{product_name}")
-async def scan_payment(order_id: int, product_name: str, db: Session = Depends(get_db)):
-
-
+@router.get("/scan/{order_id}")
+async def scan_payment(order_id: int, db: Session = Depends(get_db)):
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
 
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
+
+    if order.status == "paid":
+        return {"message": "Payment already processed. You may return to the machine."}
 
     order.status = "paid"
     db.commit()

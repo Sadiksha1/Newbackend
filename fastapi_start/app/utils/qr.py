@@ -6,13 +6,18 @@ QR_FOLDER = "qrcodes"
 if not os.path.exists(QR_FOLDER):
     os.makedirs(QR_FOLDER)
 
-def generate_fonepay_qr(amount: float, product_name: str) -> str:
+def generate_fonepay_qr(amount: float, reference: str) -> str:
     # Static merchant details for showcase
     merchant_code = "TESTMERCHANT123"
     invoice_number = datetime.now().strftime("%Y%m%d%H%M%S")
 
     # Simulated Fonepay QR content
-    qr_data = f"FONEPAY://merchant={merchant_code}&amount={amount}&invoice={invoice_number}&product={product_name}"
+    qr_data = (
+        f"FONEPAY://merchant={merchant_code}"
+        f"&amount={amount}"
+        f"&invoice={invoice_number}"
+        f"&reference={reference}"
+    )
 
     # File path
     qr_filename = f"fonepay_{invoice_number}.png"
