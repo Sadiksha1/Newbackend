@@ -1,0 +1,9 @@
+alembic
+python-dotenv
+fastapi
+mako
+normalizer    # (This is guess-based — verify if it's the package name you installed)
+qrcode        # qr.exe typically comes from the 'qrcode' package
+uvicorn
+watchfiles
+websockets
