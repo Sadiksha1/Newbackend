@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 from pydantic import BaseModel, Field
 
 class ProductBase(BaseModel):
@@ -39,6 +39,55 @@ class ProductSales(BaseModel):
     total_revenue: float
 
 
+class CategoryBreakdown(BaseModel):
+    category: str
+    total_quantity: int
+    total_revenue: float
+
+
+class DailyRevenue(BaseModel):
+    date: date
+    revenue: float
+
+
+class ForecastPoint(BaseModel):
+    date: date
+    revenue: float
+
+
+class MonthlySales(BaseModel):
+    month: str
+    year: int
+    total_revenue: float
+    total_orders: int
+
+
+class HourlySales(BaseModel):
+    hour: int
+    total_revenue: float
+    total_orders: int
+
+
+class ForecastPoint(BaseModel):
+    date: date
+    revenue: float
+
+
+class AdvancedAnalytics(BaseModel):
+    slope: float
+    intercept: float
+    r2: float
+    sample_count: int
+    last_7d_revenue: float
+    last_30d_revenue: float
+    last_7d_avg: float
+    mom_growth_pct: float
+    forecast_next_7: list[ForecastPoint]
+    forecast_next_month: float
+    monthly_sales: list[MonthlySales]
+    hourly_sales: list[HourlySales]
+
+
 class AdminAnalytics(BaseModel):
     total_orders: int
     paid_orders: int
@@ -46,4 +95,6 @@ class AdminAnalytics(BaseModel):
     total_revenue: float
     average_ticket_size: float
     top_products: list[ProductSales]
+    category_breakdown: list[CategoryBreakdown]
+    revenue_by_date: list[DailyRevenue]
 

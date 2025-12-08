@@ -65,27 +65,60 @@ def seed():
         for p in products:
             db.refresh(p)
 
-        # Orders (mix of paid and pending)
+        # Orders with varied dates and times for testing analytics
         now = datetime.utcnow()
-        # Orders (mix of paid and pending) based on available products
         sample_orders = []
+        
         if products:
-            # paid orders
-            for i, product in enumerate(products[:3]):
+            # Create orders across different months (last 3 months)
+            months_back = [2, 1, 0]  # 2 months ago, 1 month ago, current month
+            categories_list = ["snack", "chocolate", "noodle", "juice", "biscuit", "soap"]
+            
+            # Update product categories for variety
+            for idx, product in enumerate(products):
+                product.category = categories_list[idx % len(categories_list)]
+            db.commit()
+            
+            # Paid orders across different dates and times
+            order_idx = 0
+            for month_offset in months_back:
+                base_date = now - timedelta(days=30 * month_offset)
+                
+                # Create orders for different days in each month
+                for day_offset in range(0, 15, 2):  # Every 2 days
+                    order_date = base_date - timedelta(days=day_offset)
+                    
+                    # Create orders at different hours (8 AM to 10 PM)
+                    for hour in [8, 10, 12, 14, 16, 18, 20, 22]:
+                        if order_idx >= len(products):
+                            break
+                        
+                        product = products[order_idx % len(products)]
+                        order_datetime = order_date.replace(hour=hour, minute=30, second=0, microsecond=0)
+                        
+                        sample_orders.append(
+                            {
+                                "product": product,
+                                "quantity": (order_idx % 3) + 1,
+                                "status": "paid",
+                                "created_at": order_datetime,
+                            }
+                        )
+                        order_idx += 1
+                        
+                        if order_idx >= 50:  # Limit total orders
+                            break
+                    if order_idx >= 50:
+                        break
+                if order_idx >= 50:
+                    break
+            
+            # Add some recent pending orders
+            for i in range(min(5, len(products))):
                 sample_orders.append(
                     {
-                        "product": product,
-                        "quantity": i + 1,
-                        "status": "paid",
-                        "created_at": now - timedelta(hours=5 - i * 2),
-                    }
-                )
-            # pending orders
-            for i, product in enumerate(products[:2]):
-                sample_orders.append(
-                    {
-                        "product": product,
-                        "quantity": i + 1,
+                        "product": products[i],
+                        "quantity": 1,
                         "status": "pending",
                         "created_at": now - timedelta(minutes=30 - i * 10),
                     }
