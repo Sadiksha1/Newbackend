@@ -42,3 +42,48 @@ async def upload_image(file: UploadFile = File(...)):
 app.include_router(product.router)
 app.include_router(payment.router)
 app.include_router(admin.router)
+
+from app.controller import VendingMachine
+
+# --- CONFIGURATION ---
+ARDUINO_PORT = 'COM3'  # <--- CHANGE THIS TO YOUR PORT
+
+def main():
+    # 1. Initialize the Machine
+    vm = VendingMachine(ARDUINO_PORT)
+    
+    if not vm.connect():
+        return # Exit if connection fails
+
+    print("\n--- VENDING MACHINE TEST CONSOLE ---")
+    print("Type a product number (1-4) to dispense.")
+    print("Type 'q' to quit.\n")
+
+    while True:
+        user_input = input("Select Product (1-4): ")
+
+        if user_input.lower() == 'q':
+            break
+
+        if user_input in ['1', '2', '3', '4']:
+            print(f"\nProcessing Payment for Product {user_input}...")
+            
+            # --- MOCK PAYMENT SUCCESS ---
+            payment_success = True 
+            
+            if payment_success:
+                print("Payment Verified. Dispensing...")
+                success = vm.dispense_item(int(user_input))
+                
+                if success:
+                    print(">> SUCCESS: Please take your item.\n")
+                else:
+                    print(">> ERROR: Machine Malfunction (Refund Initiated).\n")
+        else:
+            print("Invalid Selection. Try 1, 2, 3, or 4.")
+
+    vm.close()
+    print("System Shutdown.")
+
+if __name__ == "__main__":
+    main()
