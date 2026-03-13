@@ -497,11 +497,22 @@ def get_advanced_analytics(
         for row in hourly_rows
     ]
 
+    feature_names = [
+        "day_index",
+        "day_of_week",
+        "is_weekend",
+        "month",
+        "is_holiday",
+    ]
+
     return schemas.AdvancedAnalytics(
         slope=slope,
         intercept=simple_intercept,
         r2=r2,
         sample_count=sample_count,
+        multi_intercept=round(intercept, 4),
+        coefficients=[round(c, 4) for c in coefficients],
+        feature_names=feature_names,
         last_7d_revenue=round(last_7, 2),
         last_30d_revenue=round(last_30, 2),
         last_7d_avg=round(last_7 / 7, 2) if last_7 else 0.0,

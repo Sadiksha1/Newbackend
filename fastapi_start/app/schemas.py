@@ -74,16 +74,24 @@ class ForecastPoint(BaseModel):
 
 
 class AdvancedAnalytics(BaseModel):
+    # Simple 1-D trend regression (backward compat)
     slope: float
     intercept: float
+    # Multi-feature OLS regression
     r2: float
     sample_count: int
+    multi_intercept: float
+    coefficients: list[float]
+    feature_names: list[str]
+    # Rolling window KPIs
     last_7d_revenue: float
     last_30d_revenue: float
     last_7d_avg: float
     mom_growth_pct: float
+    # Forecasts
     forecast_next_7: list[ForecastPoint]
     forecast_next_month: float
+    # Breakdowns
     monthly_sales: list[MonthlySales]
     hourly_sales: list[HourlySales]
 
