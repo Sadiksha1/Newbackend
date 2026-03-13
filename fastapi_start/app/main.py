@@ -43,13 +43,11 @@ app.include_router(product.router)
 app.include_router(payment.router)
 app.include_router(admin.router)
 
-from app.controller import VendingMachine
-
 # --- CONFIGURATION ---
 ARDUINO_PORT = 'COM3'  # <--- CHANGE THIS TO YOUR PORT
 
 def main():
-    # 1. Initialize the Machine
+    from app.controller import VendingMachine  # only needed for Arduino console mode
     vm = VendingMachine(ARDUINO_PORT)
     
     if not vm.connect():
