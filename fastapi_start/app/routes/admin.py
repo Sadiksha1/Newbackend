@@ -217,9 +217,14 @@ def _sum_between(revenue_map: dict[date, float], start: date, end: date) -> floa
 # ---------------------------------------------------------------------------
 # Feature extraction — add/remove features here, everything else auto-adapts
 # ---------------------------------------------------------------------------
-def _extract_features(dt: date, num_orders: int, total_qty: int) -> List[float]:
+def _extract_features(dt: date, num_orders: int = 0, total_qty: int = 0) -> List[float]:
     """
-    Feature vector for one day. Index 0 (day_index) is always filled by caller.
+    Feature vector for one day — calendar/time signals only.
+
+    num_orders and total_qty are accepted but intentionally excluded:
+    both are highly correlated with revenue by definition (revenue = price x qty),
+    which inflates R² without improving genuine out-of-sample forecasts.
+    Using only knowable-in-advance features keeps forecasting honest.
 
     Index  Name            Description
     -----  --------------  -----------------------------------------------
@@ -227,18 +232,14 @@ def _extract_features(dt: date, num_orders: int, total_qty: int) -> List[float]:
       1    day_of_week     0=Mon … 6=Sun
       2    is_weekend      1 if Sat/Sun, else 0
       3    month           1–12, captures seasonality
-      4    num_orders      paid order count that day
-      5    total_quantity  total units sold that day
-      6    is_holiday      1 if Nepali public holiday, else 0
+      4    is_holiday      1 if Nepali public holiday, else 0
     """
     return [
         0.0,                                         # 0: day_index (filled by caller)
         float(dt.weekday()),                         # 1: day_of_week
         1.0 if dt.weekday() >= 5 else 0.0,          # 2: is_weekend
         float(dt.month),                             # 3: month
-        float(num_orders),                           # 4: num_orders
-        float(total_qty),                            # 5: total_quantity
-        1.0 if dt in NEPAL_HOLIDAYS else 0.0,        # 6: is_holiday
+        1.0 if dt in NEPAL_HOLIDAYS else 0.0,        # 4: is_holiday
     ]
 
 
@@ -392,7 +393,7 @@ def get_advanced_analytics(
         elif isinstance(dt, datetime):
             dt = dt.date()
 
-        features    = _extract_features(dt, int(row.num_orders or 0), int(row.total_qty or 0))
+        features    = _extract_features(dt)
         features[0] = float(idx)  # fill day_index
         multi_points.append((features, float(row.rev or 0.0)))
 
@@ -421,16 +422,11 @@ def get_advanced_analytics(
     if prev_7 > 0:
         mom_growth_pct = ((last_7 - prev_7) / prev_7) * 100
 
-    # Trailing averages used for unknowable future num_orders / total_qty
-    trailing_n       = min(7, sample_count) or 1
-    avg_orders_last7 = sum(f[4] for f, _ in multi_points[-trailing_n:]) / trailing_n
-    avg_qty_last7    = sum(f[5] for f, _ in multi_points[-trailing_n:]) / trailing_n
-
-    # Forecast next 7 days
+    # Forecast next 7 days — only calendar features needed (all knowable in advance)
     forecast = []
     for i in range(1, 8):
         future_date     = last_date + timedelta(days=i)
-        future_features = _extract_features(future_date, int(avg_orders_last7), int(avg_qty_last7))
+        future_features = _extract_features(future_date)
         future_features[0] = float(sample_count + i - 1)
         y_pred = intercept + sum(c * f for c, f in zip(coefficients, future_features))
         forecast.append(
@@ -445,7 +441,7 @@ def get_advanced_analytics(
     if sample_count >= 2:
         for i in range(1, 31):
             future_date     = last_date + timedelta(days=i)
-            future_features = _extract_features(future_date, int(avg_orders_last7), int(avg_qty_last7))
+            future_features = _extract_features(future_date)
             future_features[0] = float(sample_count + i - 1)
             y_pred = intercept + sum(c * f for c, f in zip(coefficients, future_features))
             forecast_next_month += max(0.0, y_pred)
