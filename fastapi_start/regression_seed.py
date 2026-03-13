@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """
-Seed 15 days of synthetic vending machine orders designed to make the
-multiple linear regression in /admin/analytics/advanced clearly visible.
+Seed a fixed 14‑day window of **deterministic** orders and revenue so that
+the regression in /admin/analytics/advanced runs on the exact dataset used
+in the analysis report (Dec 28, 2024 – Jan 10, 2025).
 
-Patterns baked in so the regression has real signals to fit:
-  - Gentle upward revenue trend over time      → slope > 0
-  - Higher sales on weekends                   → is_weekend coefficient
-  - Higher sales on Nepali public holidays      → is_holiday coefficient
-  - Morning/lunch/evening peaks                → hourly chart
-  - Monthly variation                          → month coefficient
+Each day has a specified:
+  - date
+  - number of paid orders (n)
+  - total daily revenue y_i (NPR)
 
 Usage (run from fastapi_start/ directory):
     python regression_seed.py               # clears orders only, keeps products
@@ -17,9 +16,7 @@ Usage (run from fastapi_start/ directory):
 import argparse
 import hashlib
 import os
-import random
-from datetime import date, datetime, timedelta
-from pathlib import Path
+from datetime import date, datetime
 
 from app.database import SessionLocal
 from app import models
@@ -29,17 +26,6 @@ def hash_password(password: str) -> str:
     """Mirrors app.utils.security.hash_password without importing jose."""
     salt = os.getenv("ADMIN_PASSWORD_SALT", "static-salt")
     return hashlib.sha256(f"{salt}:{password}".encode()).hexdigest()
-
-# ── Nepali public holidays (keep in sync with admin.py) ──────────────────────
-NEPAL_HOLIDAYS: set[date] = {
-    date(2024, 10, 13), date(2024, 10, 29), date(2024, 10, 31),
-    date(2024, 11, 1),  date(2024, 1, 15),  date(2024, 4, 14),
-    date(2025, 1, 14),  date(2025, 4, 14),  date(2025, 5, 1),
-    date(2025, 10, 3),  date(2025, 10, 18), date(2025, 10, 20),
-    date(2025, 10, 21),
-    date(2026, 1, 11),  date(2026, 2, 19),  date(2026, 3, 3),
-    date(2026, 4, 14),  date(2026, 5, 1),
-}
 
 # ── Synthetic products (no real image files needed) ───────────────────────────
 SYNTHETIC_PRODUCTS = [
@@ -51,72 +37,29 @@ SYNTHETIC_PRODUCTS = [
     {"name": "Wai Wai Noodles",     "price": 35.0,  "category": "noodles",   "image": "waiwai.jpg"},
 ]
 
-# Hour weights — peaks at 10 AM, 12–1 PM, 5–7 PM
-_HOURS        = list(range(8, 22))
-_HOUR_WEIGHTS = [2, 4, 6, 8, 7, 5, 4, 5, 7, 8, 7, 5, 3, 2]   # len == 14
-
-
-def _orders_for_day(
-    target_date: date,
-    products: list,
-    rng: random.Random,
-    start_date: date,
-) -> list[dict]:
-    """Return a list of order dicts for one calendar day."""
-    is_weekend = target_date.weekday() >= 5          # Sat or Sun
-    is_holiday = target_date in NEPAL_HOLIDAYS
-
-    # Base daily count grows gently over the 90-day window (trend)
-    trend_idx   = (target_date - start_date).days    # 0 … 89
-    base_count  = 4 + int(trend_idx * 0.40)          # 4 → ~10 over 15 days
-
-    # Multipliers per day type  ← these create the regression signals
-    if is_holiday:
-        multiplier = rng.uniform(2.0, 2.8)
-    elif is_weekend:
-        multiplier = rng.uniform(1.4, 1.9)
-    else:
-        multiplier = rng.uniform(0.6, 1.2)
-
-    n_orders = max(1, int(round(base_count * multiplier + rng.gauss(0, 1.2))))
-
-    orders = []
-    for _ in range(n_orders):
-        product  = rng.choice(products)
-        quantity = rng.choices([1, 2, 3], weights=[0.60, 0.30, 0.10])[0]
-        hour     = rng.choices(_HOURS, weights=_HOUR_WEIGHTS)[0]
-        minute   = rng.randint(0, 59)
-        second   = rng.randint(0, 59)
-        dt       = datetime(
-            target_date.year, target_date.month, target_date.day,
-            hour, minute, second,
-        )
-        orders.append({
-            "product":    product,
-            "quantity":   quantity,
-            "status":     "paid",
-            "created_at": dt,
-        })
-
-    # A small number of failed (pending-stuck) orders every few days
-    if rng.random() < 0.25:
-        for _ in range(rng.randint(1, 2)):
-            product = rng.choice(products)
-            hour    = rng.choices(_HOURS, weights=_HOUR_WEIGHTS)[0]
-            dt      = datetime(target_date.year, target_date.month, target_date.day, hour, rng.randint(0, 59))
-            orders.append({
-                "product":    product,
-                "quantity":   1,
-                "status":     "pending",
-                "created_at": dt,
-            })
-
-    return orders
+# ── Fixed daily regression dataset (Dec 28, 2024 – Jan 10, 2025) ──────────────
+# Matches the report screenshot: i, Date, Day, Holiday, Orders(n), Revenue y_i
+DAY_DATA = [
+    # i,        date,               orders, revenue_y_i
+    (0, date(2024, 12, 28), 20,  710.00),  # Saturday, YES — Udhauli
+    (1, date(2024, 12, 29), 15,  960.00),  # Sunday
+    (2, date(2024, 12, 30), 15, 1220.00),  # Monday
+    (3, date(2024, 12, 31), 14,  860.00),  # Tuesday
+    (4, date(2025, 1, 1),   12,  765.00),  # Wednesday
+    (5, date(2025, 1, 2),   13,  560.00),  # Thursday
+    (6, date(2025, 1, 3),   13,  480.00),  # Friday
+    (7, date(2025, 1, 4),   18, 1285.00),  # Saturday
+    (8, date(2025, 1, 5),   14,  970.00),  # Sunday
+    (9, date(2025, 1, 6),    9,  670.00),  # Monday
+    (10, date(2025, 1, 7),  11,  615.00),  # Tuesday
+    (11, date(2025, 1, 8),  13,  635.00),  # Wednesday
+    (12, date(2025, 1, 9),  15,  915.00),  # Thursday
+    (13, date(2025, 1, 10), 10,  825.00),  # Friday
+]
 
 
 def seed(full_reset: bool = False) -> None:
-    rng = random.Random(42)   # fixed seed → reproducible data
-    db  = SessionLocal()
+    db = SessionLocal()
 
     try:
         # ── Clear data ────────────────────────────────────────────────────────
@@ -155,25 +98,50 @@ def seed(full_reset: bool = False) -> None:
         else:
             print(f"ℹ  Using {len(products)} existing products.")
 
-        # ── Generate 90 days of orders ────────────────────────────────────────
-        end_date   = date.today()
-        start_date = end_date - timedelta(days=14)   # 15 days inclusive
-        print(f"📅 Generating orders from {start_date} to {end_date}…")
+        # ── Generate fixed 14 days of orders ──────────────────────────────────
+        print("📅 Inserting fixed regression dataset (Dec 28, 2024 – Jan 10, 2025)…")
 
         all_order_objs = []
-        current = start_date
-        while current <= end_date:
-            day_orders = _orders_for_day(current, products, rng, start_date)
-            for o in day_orders:
-                amount = round(o["product"].price * o["quantity"], 2)
-                all_order_objs.append(models.Order(
-                    amount=amount,
-                    product_id=o["product"].id,
-                    quantity=o["quantity"],
-                    status=o["status"],
-                    created_at=o["created_at"],
-                ))
-            current += timedelta(days=1)
+        for _, day_date, n_orders, total_revenue in DAY_DATA:
+            if n_orders <= 0:
+                continue
+
+            # Split total daily revenue evenly across n_orders.
+            # Use all but last order with floor, and adjust last for rounding.
+            base_amount = round(total_revenue / n_orders, 2)
+            accumulated = 0.0
+
+            for idx in range(n_orders):
+                if idx == n_orders - 1:
+                    amount = round(total_revenue - accumulated, 2)
+                else:
+                    amount = base_amount
+                    accumulated += amount
+
+                product = products[idx % len(products)]
+
+                # Spread orders across the day: 10:00, 10:30, 11:00, ...
+                hour   = 10 + (idx % 10)
+                minute = (idx * 30) % 60
+
+                created_at = datetime(
+                    day_date.year,
+                    day_date.month,
+                    day_date.day,
+                    hour,
+                    minute,
+                    0,
+                )
+
+                all_order_objs.append(
+                    models.Order(
+                        amount=amount,
+                        product_id=product.id,
+                        quantity=1,
+                        status="paid",
+                        created_at=created_at,
+                    )
+                )
 
         db.add_all(all_order_objs)
         db.commit()
@@ -183,17 +151,11 @@ def seed(full_reset: bool = False) -> None:
         total_revenue = sum(o.amount for o in all_order_objs if o.status == "paid")
 
         print("\n✅ Regression seed complete:")
-        print(f"   Days covered  : {(end_date - start_date).days + 1} (last 15 days)")
+        print(f"   Days covered  : {len(DAY_DATA)} (Dec 28, 2024 – Jan 10, 2025)")
         print(f"   Total orders  : {len(all_order_objs)}")
         print(f"     ├─ paid     : {paid_count}")
         print(f"     └─ pending  : {pending_count}")
         print(f"   Total revenue : Rs. {total_revenue:,.2f}")
-        print("\n   Patterns embedded for regression:")
-        print("     ✔ Upward trend over 90 days")
-        print("     ✔ Weekend spike (×1.4–1.9)")
-        print("     ✔ Holiday spike (×2.0–2.8)")
-        print("     ✔ Hourly peaks at 10 AM, 12–1 PM, 5–7 PM")
-        print("     ✔ Monthly seasonality (Jan–Apr period)")
         print("\n   Visit /admin/analytics/advanced after logging in to see results.")
 
     finally:
