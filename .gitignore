@@ -129,8 +129,6 @@ dmypy.json
 products.db
 
 # User-uploaded files (keep directory structure, ignore contents)
-fastapi_start/photos/*
-!fastapi_start/photos/.gitkeep
 fastapi_start/qrcodes/*
 !fastapi_start/qrcodes/.gitkeep
 
