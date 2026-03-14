@@ -12,10 +12,16 @@ def get_db():
     finally:
         db.close()
 
-# GET all products
+# GET all products (admin / backend use)
 @router.get("/", response_model=list[schemas.ProductOut])
 def get_all_products(db: Session = Depends(get_db)):
     return db.query(models.Product).all()
+
+
+# GET only products that are in stock (customer-facing vending UI)
+@router.get("/available", response_model=list[schemas.ProductOut])
+def get_available_products(db: Session = Depends(get_db)):
+    return db.query(models.Product).filter(models.Product.quantity > 0).all()
 
 # GET single product by ID (new)
 @router.get("/{product_id}", response_model=schemas.ProductOut)

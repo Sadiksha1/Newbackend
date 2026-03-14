@@ -21,6 +21,10 @@ async def create_order(order: schemas.OrderCreate, db: Session = Depends(get_db)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
+    # Prevent creating orders for out-of-stock items
+    if (product.quantity or 0) < order.quantity:
+        raise HTTPException(status_code=400, detail="Product out of stock")
+
     total_amount = round(product.price * order.quantity, 2)
 
     new_order = models.Order(
@@ -47,6 +51,12 @@ async def scan_payment(order_id: int, db: Session = Depends(get_db)):
 
     if order.status == "paid":
         return {"message": "Payment already processed. You may return to the machine."}
+
+    # Mark paid and decrement product stock atomically
+    product = db.query(models.Product).filter(models.Product.id == order.product_id).first()
+    if product:
+        new_qty = max((product.quantity or 0) - order.quantity, 0)
+        product.quantity = new_qty
 
     order.status = "paid"
     db.commit()
