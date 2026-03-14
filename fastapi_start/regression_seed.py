@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 """
-Full reset: delete everything (orders, products, admins), then re-insert:
-  - Admin: admin / changeme123
-  - Current products (from DB before delete), same ids
-  - Current orders (from DB before delete), unchanged
+Full reset: delete everything, then recreate products.db from embedded snapshot.
+Admin: admin / changeme123. All products and orders are baked in.
+Running this on any computer produces the same DB state.
 
-Usage (run from fastapi_start/ directory):
-    python regression_seed.py
+Usage: python regression_seed.py
 """
 import hashlib
 import os
@@ -15,114 +13,269 @@ from datetime import datetime
 from app.database import SessionLocal
 from app import models
 
-# Fixed admin credentials
 ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD = "changeme123"
 
+# ── Embedded snapshot (products.db current state) ─────────────────────────────
+EMBEDDED_PRODUCTS = [
+    {"id": 2, "name": "Bounty", "price": 10.0, "category": "chocolate", "image": "Bounty.png", "quantity": 1},
+    {"id": 5, "name": "Darkchocolate", "price": 25.0, "category": "chocolate", "image": "DarkChocolate.png", "quantity": 1},
+    {"id": 6, "name": "Waiwai", "price": 30.0, "category": "noodle", "image": "WaiWai.png", "quantity": 6},
+    {"id": 9, "name": "Current", "price": 45.0, "category": "noodle", "image": "current.png", "quantity": 1},
+    {"id": 10, "name": "Kitkat", "price": 50.0, "category": "chocolate", "image": "kitkat.png", "quantity": 1},
+    {"id": 11, "name": "Snickers", "price": 55.0, "category": "chocolate", "image": "snickers.png", "quantity": 1},
+    {"id": 13, "name": "5-star", "price": 5.0, "category": "chocolate", "image": "5-starr.png", "quantity": 1},
+    {"id": 14, "name": "DairyMilk", "price": 200.0, "category": "chocolate", "image": "DairyyMilk.png", "quantity": 1},
+    {"id": 15, "name": "Coke", "price": 100.0, "category": "juice", "image": "coke.png", "quantity": 1},
+    {"id": 16, "name": "Fanta", "price": 150.0, "category": "juice", "image": "fanta.png", "quantity": 1},
+    {"id": 17, "name": "Orange Juice", "price": 180.0, "category": "juice", "image": "sprite.png", "quantity": 1},
+]
+
+# Orders: (id, amount, product_id, quantity, status, created_at_str)
+EMBEDDED_ORDERS_RAW = """1|35.5|2|1|paid|2024-12-28 10:00:00
+2|35.5|5|1|paid|2024-12-28 11:30:00
+3|35.5|6|1|paid|2024-12-28 12:00:00
+4|35.5|9|1|paid|2024-12-28 13:30:00
+5|35.5|10|1|paid|2024-12-28 14:00:00
+6|35.5|11|1|paid|2024-12-28 15:30:00
+7|35.5|13|1|paid|2024-12-28 16:00:00
+8|35.5|14|1|paid|2024-12-28 17:30:00
+9|35.5|15|1|paid|2024-12-28 18:00:00
+10|35.5|16|1|paid|2024-12-28 19:30:00
+11|35.5|17|1|paid|2024-12-28 10:00:00
+12|35.5|2|1|paid|2024-12-28 11:30:00
+13|35.5|5|1|paid|2024-12-28 12:00:00
+14|35.5|6|1|paid|2024-12-28 13:30:00
+15|35.5|9|1|paid|2024-12-28 14:00:00
+16|35.5|10|1|paid|2024-12-28 15:30:00
+17|35.5|11|1|paid|2024-12-28 16:00:00
+18|35.5|13|1|paid|2024-12-28 17:30:00
+19|35.5|14|1|paid|2024-12-28 18:00:00
+20|35.5|15|1|paid|2024-12-28 19:30:00
+21|64.0|2|1|paid|2024-12-29 10:00:00
+22|64.0|5|1|paid|2024-12-29 11:30:00
+23|64.0|6|1|paid|2024-12-29 12:00:00
+24|64.0|9|1|paid|2024-12-29 13:30:00
+25|64.0|10|1|paid|2024-12-29 14:00:00
+26|64.0|11|1|paid|2024-12-29 15:30:00
+27|64.0|13|1|paid|2024-12-29 16:00:00
+28|64.0|14|1|paid|2024-12-29 17:30:00
+29|64.0|15|1|paid|2024-12-29 18:00:00
+30|64.0|16|1|paid|2024-12-29 19:30:00
+31|64.0|17|1|paid|2024-12-29 10:00:00
+32|64.0|2|1|paid|2024-12-29 11:30:00
+33|64.0|5|1|paid|2024-12-29 12:00:00
+34|64.0|6|1|paid|2024-12-29 13:30:00
+35|64.0|9|1|paid|2024-12-29 14:00:00
+36|81.33|2|1|paid|2024-12-30 10:00:00
+37|81.33|5|1|paid|2024-12-30 11:30:00
+38|81.33|6|1|paid|2024-12-30 12:00:00
+39|81.33|9|1|paid|2024-12-30 13:30:00
+40|81.33|10|1|paid|2024-12-30 14:00:00
+41|81.33|11|1|paid|2024-12-30 15:30:00
+42|81.33|13|1|paid|2024-12-30 16:00:00
+43|81.33|14|1|paid|2024-12-30 17:30:00
+44|81.33|15|1|paid|2024-12-30 18:00:00
+45|81.33|16|1|paid|2024-12-30 19:30:00
+46|81.33|17|1|paid|2024-12-30 10:00:00
+47|81.33|2|1|paid|2024-12-30 11:30:00
+48|81.33|5|1|paid|2024-12-30 12:00:00
+49|81.33|6|1|paid|2024-12-30 13:30:00
+50|81.38|9|1|paid|2024-12-30 14:00:00
+51|61.43|2|1|paid|2024-12-31 10:00:00
+52|61.43|5|1|paid|2024-12-31 11:30:00
+53|61.43|6|1|paid|2024-12-31 12:00:00
+54|61.43|9|1|paid|2024-12-31 13:30:00
+55|61.43|10|1|paid|2024-12-31 14:00:00
+56|61.43|11|1|paid|2024-12-31 15:30:00
+57|61.43|13|1|paid|2024-12-31 16:00:00
+58|61.43|14|1|paid|2024-12-31 17:30:00
+59|61.43|15|1|paid|2024-12-31 18:00:00
+60|61.43|16|1|paid|2024-12-31 19:30:00
+61|61.43|17|1|paid|2024-12-31 10:00:00
+62|61.43|2|1|paid|2024-12-31 11:30:00
+63|61.43|5|1|paid|2024-12-31 12:00:00
+64|61.41|6|1|paid|2024-12-31 13:30:00
+65|63.75|2|1|paid|2025-01-01 10:00:00
+66|63.75|5|1|paid|2025-01-01 11:30:00
+67|63.75|6|1|paid|2025-01-01 12:00:00
+68|63.75|9|1|paid|2025-01-01 13:30:00
+69|63.75|10|1|paid|2025-01-01 14:00:00
+70|63.75|11|1|paid|2025-01-01 15:30:00
+71|63.75|13|1|paid|2025-01-01 16:00:00
+72|63.75|14|1|paid|2025-01-01 17:30:00
+73|63.75|15|1|paid|2025-01-01 18:00:00
+74|63.75|16|1|paid|2025-01-01 19:30:00
+75|63.75|17|1|paid|2025-01-01 10:00:00
+76|63.75|2|1|paid|2025-01-01 11:30:00
+77|43.08|2|1|paid|2025-01-02 10:00:00
+78|43.08|5|1|paid|2025-01-02 11:30:00
+79|43.08|6|1|paid|2025-01-02 12:00:00
+80|43.08|9|1|paid|2025-01-02 13:30:00
+81|43.08|10|1|paid|2025-01-02 14:00:00
+82|43.08|11|1|paid|2025-01-02 15:30:00
+83|43.08|13|1|paid|2025-01-02 16:00:00
+84|43.08|14|1|paid|2025-01-02 17:30:00
+85|43.08|15|1|paid|2025-01-02 18:00:00
+86|43.08|16|1|paid|2025-01-02 19:30:00
+87|43.08|17|1|paid|2025-01-02 10:00:00
+88|43.08|2|1|paid|2025-01-02 11:30:00
+89|43.04|5|1|paid|2025-01-02 12:00:00
+90|36.92|2|1|paid|2025-01-03 10:00:00
+91|36.92|5|1|paid|2025-01-03 11:30:00
+92|36.92|6|1|paid|2025-01-03 12:00:00
+93|36.92|9|1|paid|2025-01-03 13:30:00
+94|36.92|10|1|paid|2025-01-03 14:00:00
+95|36.92|11|1|paid|2025-01-03 15:30:00
+96|36.92|13|1|paid|2025-01-03 16:00:00
+97|36.92|14|1|paid|2025-01-03 17:30:00
+98|36.92|15|1|paid|2025-01-03 18:00:00
+99|36.92|16|1|paid|2025-01-03 19:30:00
+100|36.92|17|1|paid|2025-01-03 10:00:00
+101|36.92|2|1|paid|2025-01-03 11:30:00
+102|36.96|5|1|paid|2025-01-03 12:00:00
+103|71.39|2|1|paid|2025-01-04 10:00:00
+104|71.39|5|1|paid|2025-01-04 11:30:00
+105|71.39|6|1|paid|2025-01-04 12:00:00
+106|71.39|9|1|paid|2025-01-04 13:30:00
+107|71.39|10|1|paid|2025-01-04 14:00:00
+108|71.39|11|1|paid|2025-01-04 15:30:00
+109|71.39|13|1|paid|2025-01-04 16:00:00
+110|71.39|14|1|paid|2025-01-04 17:30:00
+111|71.39|15|1|paid|2025-01-04 18:00:00
+112|71.39|16|1|paid|2025-01-04 19:30:00
+113|71.39|17|1|paid|2025-01-04 10:00:00
+114|71.39|2|1|paid|2025-01-04 11:30:00
+115|71.39|5|1|paid|2025-01-04 12:00:00
+116|71.39|6|1|paid|2025-01-04 13:30:00
+117|71.39|9|1|paid|2025-01-04 14:00:00
+118|71.39|10|1|paid|2025-01-04 15:30:00
+119|71.39|11|1|paid|2025-01-04 16:00:00
+120|71.37|13|1|paid|2025-01-04 17:30:00
+121|69.29|2|1|paid|2025-01-05 10:00:00
+122|69.29|5|1|paid|2025-01-05 11:30:00
+123|69.29|6|1|paid|2025-01-05 12:00:00
+124|69.29|9|1|paid|2025-01-05 13:30:00
+125|69.29|10|1|paid|2025-01-05 14:00:00
+126|69.29|11|1|paid|2025-01-05 15:30:00
+127|69.29|13|1|paid|2025-01-05 16:00:00
+128|69.29|14|1|paid|2025-01-05 17:30:00
+129|69.29|15|1|paid|2025-01-05 18:00:00
+130|69.29|16|1|paid|2025-01-05 19:30:00
+131|69.29|17|1|paid|2025-01-05 10:00:00
+132|69.29|2|1|paid|2025-01-05 11:30:00
+133|69.29|5|1|paid|2025-01-05 12:00:00
+134|69.23|6|1|paid|2025-01-05 13:30:00
+135|74.44|2|1|paid|2025-01-06 10:00:00
+136|74.44|5|1|paid|2025-01-06 11:30:00
+137|74.44|6|1|paid|2025-01-06 12:00:00
+138|74.44|9|1|paid|2025-01-06 13:30:00
+139|74.44|10|1|paid|2025-01-06 14:00:00
+140|74.44|11|1|paid|2025-01-06 15:30:00
+141|74.44|13|1|paid|2025-01-06 16:00:00
+142|74.44|14|1|paid|2025-01-06 17:30:00
+143|74.48|15|1|paid|2025-01-06 18:00:00
+144|55.91|2|1|paid|2025-01-07 10:00:00
+145|55.91|5|1|paid|2025-01-07 11:30:00
+146|55.91|6|1|paid|2025-01-07 12:00:00
+147|55.91|9|1|paid|2025-01-07 13:30:00
+148|55.91|10|1|paid|2025-01-07 14:00:00
+149|55.91|11|1|paid|2025-01-07 15:30:00
+150|55.91|13|1|paid|2025-01-07 16:00:00
+151|55.91|14|1|paid|2025-01-07 17:30:00
+152|55.91|15|1|paid|2025-01-07 18:00:00
+153|55.91|16|1|paid|2025-01-07 19:30:00
+154|55.9|17|1|paid|2025-01-07 10:00:00
+155|48.85|2|1|paid|2025-01-08 10:00:00
+156|48.85|5|1|paid|2025-01-08 11:30:00
+157|48.85|6|1|paid|2025-01-08 12:00:00
+158|48.85|9|1|paid|2025-01-08 13:30:00
+159|48.85|10|1|paid|2025-01-08 14:00:00
+160|48.85|11|1|paid|2025-01-08 15:30:00
+161|48.85|13|1|paid|2025-01-08 16:00:00
+162|48.85|14|1|paid|2025-01-08 17:30:00
+163|48.85|15|1|paid|2025-01-08 18:00:00
+164|48.85|16|1|paid|2025-01-08 19:30:00
+165|48.85|17|1|paid|2025-01-08 10:00:00
+166|48.85|2|1|paid|2025-01-08 11:30:00
+167|48.8|5|1|paid|2025-01-08 12:00:00
+168|61.0|2|1|paid|2025-01-09 10:00:00
+169|61.0|5|1|paid|2025-01-09 11:30:00
+170|61.0|6|1|paid|2025-01-09 12:00:00
+171|61.0|9|1|paid|2025-01-09 13:30:00
+172|61.0|10|1|paid|2025-01-09 14:00:00
+173|61.0|11|1|paid|2025-01-09 15:30:00
+174|61.0|13|1|paid|2025-01-09 16:00:00
+175|61.0|14|1|paid|2025-01-09 17:30:00
+176|61.0|15|1|paid|2025-01-09 18:00:00
+177|61.0|16|1|paid|2025-01-09 19:30:00
+178|61.0|17|1|paid|2025-01-09 10:00:00
+179|61.0|2|1|paid|2025-01-09 11:30:00
+180|61.0|5|1|paid|2025-01-09 12:00:00
+181|61.0|6|1|paid|2025-01-09 13:30:00
+182|61.0|9|1|paid|2025-01-09 14:00:00
+183|82.5|2|1|paid|2025-01-10 10:00:00
+184|82.5|5|1|paid|2025-01-10 11:30:00
+185|82.5|6|1|paid|2025-01-10 12:00:00
+186|82.5|9|1|paid|2025-01-10 13:30:00
+187|82.5|10|1|paid|2025-01-10 14:00:00
+188|82.5|11|1|paid|2025-01-10 15:30:00
+189|82.5|13|1|paid|2025-01-10 16:00:00
+190|82.5|14|1|paid|2025-01-10 17:30:00
+191|82.5|15|1|paid|2025-01-10 18:00:00
+192|82.5|16|1|paid|2025-01-10 19:30:00
+"""
+
+
+def _parse_orders() -> list[dict]:
+    out = []
+    for line in EMBEDDED_ORDERS_RAW.strip().split("\n"):
+        parts = line.strip().split("|")
+        if len(parts) != 6:
+            continue
+        oid, amount, pid, qty, status, ts = parts
+        out.append({
+            "id": int(oid),
+            "amount": float(amount),
+            "product_id": int(pid),
+            "quantity": int(qty),
+            "status": status,
+            "created_at": datetime.strptime(ts, "%Y-%m-%d %H:%M:%S"),
+        })
+    return out
+
 
 def hash_password(password: str) -> str:
-    """Mirrors app.utils.security.hash_password without importing jose."""
     salt = os.getenv("ADMIN_PASSWORD_SALT", "static-salt")
     return hashlib.sha256(f"{salt}:{password}".encode()).hexdigest()
 
 
 def seed() -> None:
     db = SessionLocal()
-
     try:
-        # ── 1. Fetch current products and orders (before delete) ─────────────
-        print("📥 Fetching current products and orders…")
-        products_rows = db.query(models.Product).order_by(models.Product.id).all()
-        orders_rows = db.query(models.Order).order_by(models.Order.id).all()
-
-        products_data = [
-            {
-                "id": p.id,
-                "name": p.name,
-                "price": p.price,
-                "category": p.category,
-                "image": p.image,
-                "quantity": getattr(p, "quantity", 1) or 1,
-            }
-            for p in products_rows
-        ]
-        orders_data = [
-            {
-                "id": o.id,
-                "amount": o.amount,
-                "product_id": o.product_id,
-                "quantity": o.quantity,
-                "status": o.status,
-                "created_at": o.created_at,
-            }
-            for o in orders_rows
-        ]
-
-        n_products = len(products_data)
-        n_orders = len(orders_data)
-        print(f"   Products: {n_products}, Orders: {n_orders}")
-
-        # ── 2. Delete everything (orders, products, admins) ───────────────────
-        print("🗑  Deleting all orders…")
+        print("🗑  Deleting all orders, products, admins…")
         db.query(models.Order).delete()
-        print("🗑  Deleting all products…")
         db.query(models.Product).delete()
-        print("🗑  Deleting all admins…")
         db.query(models.Admin).delete()
         db.commit()
 
-        # ── 3. Insert admin (admin / changeme123) ─────────────────────────────
         print("👤 Creating admin (admin / changeme123)…")
-        db.add(
-            models.Admin(
-                username=ADMIN_USERNAME,
-                password_hash=hash_password(ADMIN_PASSWORD),
-            )
-        )
+        db.add(models.Admin(username=ADMIN_USERNAME, password_hash=hash_password(ADMIN_PASSWORD)))
         db.commit()
-        print("   ✅ Admin created.")
 
-        # ── 4. Re-insert products with same ids, quantity = 1 ─────────────────
-        if products_data:
-            print("📦 Re-inserting products (quantity set to 1)…")
-            for p in products_data:
-                db.add(
-                    models.Product(
-                        id=p["id"],
-                        name=p["name"],
-                        price=p["price"],
-                        category=p["category"],
-                        image=p["image"],
-                        quantity=1,
-                    )
-                )
-            db.commit()
-            print(f"   ✅ {len(products_data)} products re-inserted.")
-        else:
-            print("   ⚠ No products to re-insert (DB was empty).")
+        print("📦 Inserting products…")
+        for p in EMBEDDED_PRODUCTS:
+            db.add(models.Product(**p))
+        db.commit()
 
-        # ── 5. Re-insert orders unchanged ────────────────────────────────────
-        if orders_data:
-            print("📅 Re-inserting orders (unchanged)…")
-            for o in orders_data:
-                db.add(
-                    models.Order(
-                        id=o["id"],
-                        amount=o["amount"],
-                        product_id=o["product_id"],
-                        quantity=o["quantity"],
-                        status=o["status"],
-                        created_at=o["created_at"],
-                    )
-                )
-            db.commit()
-            print(f"   ✅ {len(orders_data)} orders re-inserted.")
-        else:
-            print("   ⚠ No orders to re-insert (DB had none).")
+        orders_data = _parse_orders()
+        print(f"📅 Inserting {len(orders_data)} orders…")
+        for o in orders_data:
+            db.add(models.Order(**o))
+        db.commit()
 
-        print("\n✅ Full reset complete. Admin: admin / changeme123")
-        print("   Products and orders restored as before.")
-
+        print("\n✅ Done. products.db recreated with embedded snapshot.")
+        print("   Admin: admin / changeme123")
     finally:
         db.close()
 
