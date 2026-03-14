@@ -10,7 +10,7 @@ import hashlib
 import os
 from datetime import datetime
 
-from app.database import SessionLocal
+from app.database import SessionLocal, engine, Base
 from app import models
 
 ADMIN_USERNAME = "admin"
@@ -251,6 +251,7 @@ def hash_password(password: str) -> str:
 
 
 def seed() -> None:
+    Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
         print("🗑  Deleting all orders, products, admins…")
