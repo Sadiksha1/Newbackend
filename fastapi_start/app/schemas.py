@@ -6,12 +6,16 @@ class ProductBase(BaseModel):
     price: float
     category: str
     image: str
+    quantity: int = 1
+
 
 class ProductCreate(ProductBase):
     pass
 
+
 class ProductOut(ProductBase):
     id: int
+
     class Config:
         from_attributes = True
 

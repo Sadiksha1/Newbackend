@@ -29,12 +29,12 @@ def hash_password(password: str) -> str:
 
 # ── Synthetic products (no real image files needed) ───────────────────────────
 SYNTHETIC_PRODUCTS = [
-    {"name": "Lays Classic Chips",  "price": 30.0,  "category": "snack",     "image": "lays.jpg"},
-    {"name": "Coca Cola Can",       "price": 50.0,  "category": "drinks",    "image": "coke.jpg"},
-    {"name": "Oreo Cookies",        "price": 45.0,  "category": "snack",     "image": "oreo.jpg"},
-    {"name": "Mineral Water 500ml", "price": 20.0,  "category": "drinks",    "image": "water.jpg"},
-    {"name": "Kurkure Masala",      "price": 25.0,  "category": "snack",     "image": "kurkure.jpg"},
-    {"name": "Wai Wai Noodles",     "price": 35.0,  "category": "noodles",   "image": "waiwai.jpg"},
+    {"name": "Lays Classic Chips",  "price": 30.0,  "category": "snack",   "image": "lays.jpg",   "quantity": 1},
+    {"name": "Coca Cola Can",       "price": 50.0,  "category": "drinks",  "image": "coke.jpg",   "quantity": 1},
+    {"name": "Oreo Cookies",        "price": 45.0,  "category": "snack",   "image": "oreo.jpg",   "quantity": 1},
+    {"name": "Mineral Water 500ml", "price": 20.0,  "category": "drinks",  "image": "water.jpg",  "quantity": 1},
+    {"name": "Kurkure Masala",      "price": 25.0,  "category": "snack",   "image": "kurkure.jpg","quantity": 1},
+    {"name": "Wai Wai Noodles",     "price": 35.0,  "category": "noodles", "image": "waiwai.jpg", "quantity": 1},
 ]
 
 # ── Fixed daily regression dataset (Dec 28, 2024 – Jan 10, 2025) ──────────────

@@ -9,6 +9,7 @@ class Product(Base):
     price = Column(Float)
     category = Column(String)
     image = Column(String)
+    quantity = Column(Integer, nullable=False, default=1)
 
 class Order(Base):
     __tablename__ = "orders"

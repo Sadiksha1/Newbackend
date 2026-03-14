@@ -57,6 +57,7 @@ def seed():
                     price=price,
                     category="snack",
                     image=filename,
+                    quantity=1,
                 )
             )
 
