@@ -1,4 +1,6 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+import socket
+
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.database import Base, engine
@@ -6,6 +8,18 @@ from app.routes import product, payment, admin
 import os
 
 app = FastAPI()
+
+
+def _get_lan_ip() -> str:
+    """Get this machine's LAN IP (for QR code - reachable from phone on same WiFi)."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
 
 # Allow CORS
 app.add_middleware(
@@ -37,6 +51,17 @@ async def upload_image(file: UploadFile = File(...)):
     with open(file_location, "wb") as buffer:
         buffer.write(await file.read())
     return {"filename": file.filename, "file_location": file_location}
+
+
+@app.get("/api/qr-base-url")
+async def get_qr_base_url(request: Request):
+    """Return the base URL for QR codes (LAN IP + port) so the phone can reach the backend."""
+    port = request.url.port or 8002
+    lan_ip = _get_lan_ip()
+    qr_base_url = f"http://{lan_ip}:{port}"
+    print(f"QR base URL forwarded to checkout: {qr_base_url}")
+    return {"qr_base_url": qr_base_url}
+
 
 # Routers
 app.include_router(product.router)
