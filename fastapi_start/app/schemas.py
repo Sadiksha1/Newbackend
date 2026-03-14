@@ -20,6 +20,10 @@ class ProductOut(ProductBase):
         from_attributes = True
 
 
+class RestockRequest(BaseModel):
+    quantity_delta: int = Field(..., gt=0, example=5)
+
+
 class OrderCreate(BaseModel):
     product_id: int = Field(..., gt=0, example=1)
     quantity: int = Field(1, gt=0, le=50, example=2)

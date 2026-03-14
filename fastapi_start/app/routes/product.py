@@ -64,4 +64,19 @@ def delete_product(product_id: int, db: Session = Depends(get_db)):
     db.delete(product_db)
     db.commit()
     return {"message": "Product deleted successfully"}
-                    
+
+
+# POST - restock a product (add to quantity)
+@router.post("/{product_id}/restock", response_model=schemas.ProductOut)
+def restock_product(
+    product_id: int,
+    payload: schemas.RestockRequest,
+    db: Session = Depends(get_db),
+):
+    product_db = db.query(models.Product).filter(models.Product.id == product_id).first()
+    if not product_db:
+        raise HTTPException(status_code=404, detail="Product not found")
+    product_db.quantity = max((product_db.quantity or 0) + payload.quantity_delta, 0)
+    db.commit()
+    db.refresh(product_db)
+    return product_db
